@@ -1,0 +1,13 @@
+{
+  "name": "prestacao-contas",
+  "version": "1.0.0",
+  "description": "Dashboard de Despesas de Viagem",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server -p 8080 -c-1"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}</content>
+<parameter name="filePath">c:\drive-git\prestacao_contas\package.json

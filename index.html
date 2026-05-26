@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Despesas de Viagem</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar Menu -->
+        <aside class="sidebar">
+            <nav class="sidebar-menu">
+                <ul>
+                    <li>
+                        <a href="#" class="menu-item active" data-page="dashboard">
+                            <span class="menu-icon">📊</span>
+                            <span class="menu-text">Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="menu-item" data-page="lancamentos">
+                            <span class="menu-icon">📋</span>
+                            <span class="menu-text">Lançamentos</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-periodo">
+                <div class="card card-periodo">
+                    <div class="card-header">
+                        <h3 class="card-title">Filtro de Período</h3>
+                    </div>
+                    <div class="periodo-grid">
+                        <div class="periodo-item">
+                            <label for="sidebar-date-start" class="filter-label">De</label>
+                            <input type="date" id="sidebar-date-start" class="periodo-input">
+                        </div>
+                        <div class="periodo-item">
+                            <label for="sidebar-date-end" class="filter-label">Até</label>
+                            <input type="date" id="sidebar-date-end" class="periodo-input">
+                        </div>
+                    </div>
+                    <div class="periodo-actions">
+                        <button id="btn-aplicar-periodo" class="btn-apply-periodo">Aplicar</button>
+                        <button id="btn-limpar-periodo-sidebar" class="btn-clear-periodo">Limpar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modalidades Card in Sidebar -->
+            <div class="sidebar-modal">
+                <div class="card card-modal">
+                    <div class="card-header">
+                        <h3 class="card-title">Modalidades</h3>
+                        <span class="card-icon">🎫</span>
+                    </div>
+                    <div class="modalidade-panel">
+                        <div class="option-buttons">
+                            <button id="btn-modal-quantidade" class="option-button active">Quantidade</button>
+                            <button id="btn-modal-valor" class="option-button">Valor</button>
+                        </div>
+                        <div class="modalidade-grid">
+                            <div class="modalidade-pair">
+                                <div class="modalidade-header">Cartão</div>
+                                <div class="modalidade-value" id="modal-cartao">0</div>
+                            </div>
+                            <div class="modalidade-pair">
+                                <div class="modalidade-header">Numerário</div>
+                                <div class="modalidade-value" id="modal-numerario">0</div>
+                            </div>
+                            <div class="modalidade-pair">
+                                <div class="modalidade-header">Agência</div>
+                                <div class="modalidade-value" id="modal-agencia">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer" id="modalidade-footer">Exibe quantidade de lançamentos</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <h1 class="page-title"><img src="LOGO.png" alt="Logo" class="company-logo"> Despesas de viagem</h1>
+                </div>
+                <div class="top-bar-right">
+                    <div class="search-box">
+                        <input type="text" placeholder="Buscar..." class="search-input">
+                        <span class="search-icon">🔍</span>
+                    </div>                    <button id="btn-carregar-csv" class="btn-load-csv">📄 Carregar CSV</button>
+                    <input type="file" id="input-csv" accept=".csv" hidden>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-container">
+                <!-- Dashboard Page -->
+                <div id="dashboard-page" class="page active">
+                    <!-- Cards Section -->
+                    <section class="cards-section">
+                        <div class="card card-total">
+                            <div class="card-header">
+                                <h3 class="card-title">Total de Despesas</h3>
+                                <span class="card-icon">💰</span>
+                            </div>
+                            <div class="card-value" id="total-despesas">R$ 0,00</div>
+                            <div class="card-footer"> </div>
+                        </div>
+
+                        <div class="card card-count">
+                            <div class="card-header">
+                                <h3 class="card-title">Total de Lançamentos</h3>
+                                <span class="card-icon">📌</span>
+                            </div>
+                            <div class="card-value" id="total-lancamentos">0</div>
+                            <div class="card-footer">Número de transações</div>
+                        </div>
+
+                        <div class="card card-average">
+                            <div class="card-header">
+                                <h3 class="card-title">Ticket Médio</h3>
+                                <span class="card-icon">📈</span>
+                            </div>
+                            <div class="card-value" id="ticket-medio">R$ 0,00</div>
+                            <div class="card-footer">Valor médio por transação</div>
+                        </div>
+                    </section>
+
+                    <!-- Filters Section -->
+                    <section class="filters-section">
+                        <div class="filter-container">
+                            <div class="filter-item">
+                                <label for="filter-categoria" class="filter-label">Categoria</label>
+                                <select id="filter-categoria" class="filter-select">
+                                    <option value="">Todas as categorias</option>
+                                </select>
+                            </div>
+                            <div class="filter-item">
+                                <label for="filter-departamento" class="filter-label">Departamento</label>
+                                <select id="filter-departamento" class="filter-select">
+                                    <option value="">Todos os departamentos</option>
+                                </select>
+                            </div>
+                            <div class="filter-item">
+                                <label for="filter-funcionario" class="filter-label">Funcionário</label>
+                                <select id="filter-funcionario" class="filter-select">
+                                    <option value="">Todos os funcionários</option>
+                                </select>
+                            </div>
+                            <div class="filter-item">
+                                <label for="filter-modalidade" class="filter-label">Modalidade</label>
+                                <select id="filter-modalidade" class="filter-select">
+                                    <option value="">Todas as modalidades</option>
+                                    <option value="NUMERÁRIO">Numerário</option>
+                                    <option value="AGÊNCIA DE VIAGENS">Agência de Viagens</option>
+                                    <option value="CARTÃO CORPORATIVO">Cartão Corporativo</option>
+                                </select>
+                            </div>
+                            <button class="btn-reset" id="btn-reset-filtros">Limpar Filtros</button>
+                        </div>
+                    </section>
+
+                    <!-- Charts Section -->
+                    <section class="charts-section">
+                        <div class="chart-row">
+                            <div class="chart-container chart-modalidade">
+                                <h3 class="chart-title">Distribuição por Modalidade</h3>
+                                <canvas id="chart-modalidades"></canvas>
+                                <div class="chart-legend" id="legend-modalidades"></div>
+                            </div>
+                            <div class="chart-container chart-bar">
+                                <h3 class="chart-title">Despesas por Categoria</h3>
+                                <canvas id="chart-categorias"></canvas>
+                                <div class="chart-legend" id="legend-categorias"></div>
+                            </div>
+                        </div>
+                        <div class="chart-row">
+                            <div class="chart-container chart-departamento">
+                                <h3 class="chart-title">Despesas por Departamento</h3>
+                                <canvas id="chart-departamentos"></canvas>
+                                <div class="chart-legend" id="legend-departamentos"></div>
+                            </div>
+                            <div class="chart-container chart-funcionario">
+                                <h3 class="chart-title">Despesas por Funcionário</h3>
+                                <canvas id="chart-funcionarios"></canvas>
+                                <div class="chart-legend" id="legend-funcionarios"></div>
+                            </div>
+                        </div>
+                        <div class="chart-row chart-row-full">
+                            <div class="chart-container chart-mensal">
+                                <h3 class="chart-title">Despesas por Mês</h3>
+                                <div class="chart-controls">
+                                    <label for="date-range-start">De:</label>
+                                    <input type="date" id="date-range-start">
+                                    <label for="date-range-end">Até:</label>
+                                    <input type="date" id="date-range-end">
+                                    <button id="btn-filtrar-mensal">🔍 Filtrar</button>
+                                    <button id="btn-limpar-periodo" class="btn-clear-period">✕ Limpar Período</button>
+                                </div>
+                                <canvas id="chart-mensal"></canvas>
+                                <div class="chart-legend" id="legend-mensal"></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Lançamentos Page -->
+                <div id="lancamentos-page" class="page">
+                    <section class="lancamentos-section">
+                        <div class="lancamentos-header">
+                            <h2>Detalhamento de Lançamentos</h2>
+                            <div class="lancamentos-actions">
+                                <input type="text" id="search-lancamentos" placeholder="Buscar transação..." class="search-lancamentos">
+                                <button id="btn-export-csv" class="btn-export">  Exportar XLSX</button>
+                            </div>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="lancamentos-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Funcionário</th>
+                                        <th>Departamento</th>
+                                        <th>Modalidade</th>
+                                        <th>Categoria</th>
+                                        <th>Descrição</th>
+                                        <th>Valor</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-body">
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="pagination">
+                            <button class="btn-pagination" id="btn-prev-page">← Anterior</button>
+                            <span id="pagination-info" class="pagination-info">Página 1 de 1</span>
+                            <button class="btn-pagination" id="btn-next-page">Próxima →</button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal para detalhes -->
+    <div id="modal-detalhes" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2 id="modal-titulo">Detalhes da Transação</h2>
+            <div id="modal-body" class="modal-body">
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <!-- SheetJS Library for XLSX Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
