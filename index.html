@@ -3,225 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Despesas de Viagem</title>
+    <title>Despesas de Viagem</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Sidebar Menu -->
-        <aside class="sidebar">
-            <nav class="sidebar-menu">
-                <ul>
-                    <li>
-                        <a href="#" class="menu-item active" data-page="dashboard">
-                            <span class="menu-icon">📊</span>
-                            <span class="menu-text">Dashboard</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" class="menu-item" data-page="lancamentos">
-                            <span class="menu-icon">📋</span>
-                            <span class="menu-text">Lançamentos</span>
-                        </a>
-                    </li>
-                </ul>
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-top">
+                <div class="brand">
+                    <span class="brand-icon">M</span>
+                    <span class="brand-text">metagal</span>
+                </div>
+                <button class="btn-icon sidebar-collapse" id="btn-collapse-sidebar" title="Recolher barra lateral">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-page="lancamentos">
+                    <span class="nav-icon">📋</span>
+                    <span class="nav-label">Lançamentos</span>
+                </a>
             </nav>
 
-            <div class="sidebar-periodo">
-                <div class="card card-periodo">
-                    <div class="card-header">
-                        <h3 class="card-title">Filtro de Período</h3>
+            <div class="filters-panel open" id="filters-panel">
+                <button class="filters-panel-header" id="btn-toggle-filters" type="button">
+                    <span class="filters-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                        Filtros
+                    </span>
+                    <span class="filters-chevron">▾</span>
+                </button>
+                <div class="filters-panel-body">
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-date-start">Período — De</label>
+                        <input type="date" id="filter-date-start" class="filter-input">
                     </div>
-                    <div class="periodo-grid">
-                        <div class="periodo-item">
-                            <label for="sidebar-date-start" class="filter-label">De</label>
-                            <input type="date" id="sidebar-date-start" class="periodo-input">
-                        </div>
-                        <div class="periodo-item">
-                            <label for="sidebar-date-end" class="filter-label">Até</label>
-                            <input type="date" id="sidebar-date-end" class="periodo-input">
-                        </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-date-end">Até</label>
+                        <input type="date" id="filter-date-end" class="filter-input">
                     </div>
-                    <div class="periodo-actions">
-                        <button id="btn-aplicar-periodo" class="btn-apply-periodo">Aplicar</button>
-                        <button id="btn-limpar-periodo-sidebar" class="btn-clear-periodo">Limpar</button>
+                    <div class="filter-actions">
+                        <button type="button" class="btn btn-primary btn-sm" id="btn-aplicar-periodo">Aplicar</button>
+                        <button type="button" class="btn btn-ghost btn-sm" id="btn-limpar-periodo">Limpar</button>
                     </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-modalidade">Modalidade</label>
+                        <select id="filter-modalidade" class="filter-select">
+                            <option value="">Todas</option>
+                            <option value="NUMERÁRIO">Numerário</option>
+                            <option value="AGÊNCIA DE VIAGENS">Agência de Viagens</option>
+                            <option value="CARTÃO CORPORATIVO">Cartão Corporativo</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-categoria">Categoria</label>
+                        <select id="filter-categoria" class="filter-select">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-departamento">Departamento</label>
+                        <select id="filter-departamento" class="filter-select">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-funcionario">Funcionário</label>
+                        <select id="filter-funcionario" class="filter-select">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-danger btn-block" id="btn-reset-filtros">Limpar Filtros</button>
                 </div>
             </div>
 
-            <!-- Modalidades Card in Sidebar -->
-            <div class="sidebar-modal">
-                <div class="card card-modal">
-                    <div class="card-header">
-                        <h3 class="card-title">Modalidades</h3>
-                        <span class="card-icon">🎫</span>
-                    </div>
-                    <div class="modalidade-panel">
-                        <div class="option-buttons">
-                            <button id="btn-modal-quantidade" class="option-button active">Quantidade</button>
-                            <button id="btn-modal-valor" class="option-button">Valor</button>
-                        </div>
-                        <div class="modalidade-grid">
-                            <div class="modalidade-pair">
-                                <div class="modalidade-header">Cartão</div>
-                                <div class="modalidade-value" id="modal-cartao">0</div>
-                            </div>
-                            <div class="modalidade-pair">
-                                <div class="modalidade-header">Numerário</div>
-                                <div class="modalidade-value" id="modal-numerario">0</div>
-                            </div>
-                            <div class="modalidade-pair">
-                                <div class="modalidade-header">Agência</div>
-                                <div class="modalidade-value" id="modal-agencia">0</div>
-                            </div>
+            <div class="sidebar-modalidades">
+                <div class="modalidades-card">
+                    <div class="modalidades-header">
+                        <h3>Modalidades</h3>
+                        <div class="toggle-group">
+                            <button type="button" class="toggle-btn active" id="btn-modal-quantidade">Qtd</button>
+                            <button type="button" class="toggle-btn" id="btn-modal-valor">Valor</button>
                         </div>
                     </div>
-                    <div class="card-footer" id="modalidade-footer">Exibe quantidade de lançamentos</div>
+                    <div class="modalidade-items">
+                        <div class="modalidade-item">
+                            <span>Cartão</span>
+                            <strong id="modal-cartao">0</strong>
+                        </div>
+                        <div class="modalidade-item">
+                            <span>Numerário</span>
+                            <strong id="modal-numerario">0</strong>
+                        </div>
+                        <div class="modalidade-item">
+                            <span>Agência</span>
+                            <strong id="modal-agencia">0</strong>
+                        </div>
+                    </div>
                 </div>
             </div>
         </aside>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Top Bar -->
-            <header class="top-bar">
-                <div class="top-bar-left">
-                    <h1 class="page-title"><img src="LOGO.png" alt="Logo" class="company-logo"> Despesas de viagem</h1>
+        <main class="main">
+            <header class="header">
+                <div class="header-left">
+                    <h1 class="page-title">Despesas de viagem</h1>
+                    <span class="loading-badge hidden" id="loading-badge">Carregando...</span>
                 </div>
-                <div class="top-bar-right">
+                <div class="header-right">
                     <div class="search-box">
-                        <input type="text" placeholder="Buscar..." class="search-input">
-                        <span class="search-icon">🔍</span>
-                    </div>                    <button id="btn-carregar-csv" class="btn-load-csv">📄 Carregar CSV</button>
-                    <input type="file" id="input-csv" accept=".csv" hidden>
+                        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                        <input type="text" id="search-global" class="search-input" placeholder="Buscar...">
+                    </div>
+                    <button type="button" class="btn btn-primary" id="btn-reload">☁️ Recarregar</button>
                 </div>
             </header>
 
-            <!-- Page Content -->
-            <div class="page-container">
-                <!-- Dashboard Page -->
-                <div id="dashboard-page" class="page active">
-                    <!-- Cards Section -->
-                    <section class="cards-section">
-                        <div class="card card-total">
-                            <div class="card-header">
-                                <h3 class="card-title">Total de Despesas</h3>
-                                <span class="card-icon">💰</span>
+            <div class="content">
+                <section id="page-dashboard" class="page active">
+                    <div class="kpi-row" id="kpi-row">
+                        <article class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Total de Despesas</span>
+                                <span class="kpi-icon">💰</span>
                             </div>
-                            <div class="card-value" id="total-despesas">R$ 0,00</div>
-                            <div class="card-footer"> </div>
-                        </div>
+                            <div class="kpi-value" id="total-despesas">R$ 0,00</div>
+                        </article>
+                        <article class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Total de Lançamentos</span>
+                                <span class="kpi-icon">📌</span>
+                            </div>
+                            <div class="kpi-value" id="total-lancamentos">0</div>
+                            <span class="kpi-sub">Número de transações</span>
+                        </article>
+                        <article class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Ticket Médio</span>
+                                <span class="kpi-icon">📈</span>
+                            </div>
+                            <div class="kpi-value" id="ticket-medio">R$ 0,00</div>
+                            <span class="kpi-sub">Valor médio por transação</span>
+                        </article>
+                    </div>
 
-                        <div class="card card-count">
-                            <div class="card-header">
-                                <h3 class="card-title">Total de Lançamentos</h3>
-                                <span class="card-icon">📌</span>
-                            </div>
-                            <div class="card-value" id="total-lancamentos">0</div>
-                            <div class="card-footer">Número de transações</div>
-                        </div>
+                    <div class="active-filters hidden" id="active-filters"></div>
 
-                        <div class="card card-average">
-                            <div class="card-header">
-                                <h3 class="card-title">Ticket Médio</h3>
-                                <span class="card-icon">📈</span>
-                            </div>
-                            <div class="card-value" id="ticket-medio">R$ 0,00</div>
-                            <div class="card-footer">Valor médio por transação</div>
-                        </div>
-                    </section>
-
-                    <!-- Filters Section -->
-                    <section class="filters-section">
-                        <div class="filter-container">
-                            <div class="filter-item">
-                                <label for="filter-categoria" class="filter-label">Categoria</label>
-                                <select id="filter-categoria" class="filter-select">
-                                    <option value="">Todas as categorias</option>
-                                </select>
-                            </div>
-                            <div class="filter-item">
-                                <label for="filter-departamento" class="filter-label">Departamento</label>
-                                <select id="filter-departamento" class="filter-select">
-                                    <option value="">Todos os departamentos</option>
-                                </select>
-                            </div>
-                            <div class="filter-item">
-                                <label for="filter-funcionario" class="filter-label">Funcionário</label>
-                                <select id="filter-funcionario" class="filter-select">
-                                    <option value="">Todos os funcionários</option>
-                                </select>
-                            </div>
-                            <div class="filter-item">
-                                <label for="filter-modalidade" class="filter-label">Modalidade</label>
-                                <select id="filter-modalidade" class="filter-select">
-                                    <option value="">Todas as modalidades</option>
-                                    <option value="NUMERÁRIO">Numerário</option>
-                                    <option value="AGÊNCIA DE VIAGENS">Agência de Viagens</option>
-                                    <option value="CARTÃO CORPORATIVO">Cartão Corporativo</option>
-                                </select>
-                            </div>
-                            <button class="btn-reset" id="btn-reset-filtros">Limpar Filtros</button>
-                        </div>
-                    </section>
-
-                    <!-- Charts Section -->
-                    <section class="charts-section">
-                        <div class="chart-row">
-                            <div class="chart-container chart-modalidade">
-                                <h3 class="chart-title">Distribuição por Modalidade</h3>
+                    <div class="charts-grid">
+                        <div class="chart-card chart-half">
+                            <h3 class="chart-title">Distribuição por Modalidade</h3>
+                            <p class="chart-hint">Clique em uma fatia para filtrar</p>
+                            <div class="chart-wrap chart-wrap-pie">
                                 <canvas id="chart-modalidades"></canvas>
-                                <div class="chart-legend" id="legend-modalidades"></div>
                             </div>
-                            <div class="chart-container chart-bar">
-                                <h3 class="chart-title">Despesas por Categoria</h3>
+                            <div class="chart-legend" id="legend-modalidades"></div>
+                        </div>
+
+                        <div class="chart-card chart-half">
+                            <h3 class="chart-title">Despesas por Categoria</h3>
+                            <p class="chart-hint">Top 10 — clique na barra para filtrar</p>
+                            <div class="chart-wrap">
                                 <canvas id="chart-categorias"></canvas>
-                                <div class="chart-legend" id="legend-categorias"></div>
                             </div>
                         </div>
-                        <div class="chart-row">
-                            <div class="chart-container chart-departamento">
-                                <h3 class="chart-title">Despesas por Departamento</h3>
+
+                        <div class="chart-card chart-half">
+                            <h3 class="chart-title">Despesas por Departamento</h3>
+                            <p class="chart-hint">Top 10 — clique na barra para filtrar</p>
+                            <div class="chart-wrap">
                                 <canvas id="chart-departamentos"></canvas>
-                                <div class="chart-legend" id="legend-departamentos"></div>
                             </div>
-                            <div class="chart-container chart-funcionario">
-                                <h3 class="chart-title">Despesas por Funcionário</h3>
+                        </div>
+
+                        <div class="chart-card chart-half">
+                            <h3 class="chart-title">Despesas por Funcionário</h3>
+                            <p class="chart-hint">Top 15 — clique na barra para filtrar</p>
+                            <div class="chart-wrap">
                                 <canvas id="chart-funcionarios"></canvas>
-                                <div class="chart-legend" id="legend-funcionarios"></div>
                             </div>
                         </div>
-                        <div class="chart-row chart-row-full">
-                            <div class="chart-container chart-mensal">
-                                <h3 class="chart-title">Despesas por Mês</h3>
-                                <div class="chart-controls">
-                                    <label for="date-range-start">De:</label>
-                                    <input type="date" id="date-range-start">
-                                    <label for="date-range-end">Até:</label>
-                                    <input type="date" id="date-range-end">
-                                    <button id="btn-filtrar-mensal">🔍 Filtrar</button>
-                                    <button id="btn-limpar-periodo" class="btn-clear-period">✕ Limpar Período</button>
-                                </div>
+
+                        <div class="chart-card chart-full">
+                            <h3 class="chart-title">Despesas por Mês</h3>
+                            <p class="chart-hint">Clique em um ponto para filtrar o mês</p>
+                            <div class="chart-wrap chart-wrap-line">
                                 <canvas id="chart-mensal"></canvas>
-                                <div class="chart-legend" id="legend-mensal"></div>
                             </div>
                         </div>
-                    </section>
-                </div>
+                    </div>
+                </section>
 
-                <!-- Lançamentos Page -->
-                <div id="lancamentos-page" class="page">
-                    <section class="lancamentos-section">
-                        <div class="lancamentos-header">
+                <section id="page-lancamentos" class="page">
+                    <div class="table-card">
+                        <div class="table-header">
                             <h2>Detalhamento de Lançamentos</h2>
-                            <div class="lancamentos-actions">
-                                <input type="text" id="search-lancamentos" placeholder="Buscar transação..." class="search-lancamentos">
-                                <button id="btn-export-csv" class="btn-export">  Exportar XLSX</button>
+                            <div class="table-actions">
+                                <input type="text" id="search-lancamentos" class="search-input" placeholder="Buscar transação...">
+                                <button type="button" class="btn btn-secondary" id="btn-export">Exportar XLSX</button>
                             </div>
                         </div>
-
-                        <div class="table-wrapper">
-                            <table class="lancamentos-table">
+                        <div class="table-scroll">
+                            <table class="data-table">
                                 <thead>
                                     <tr>
                                         <th>Data</th>
@@ -231,40 +222,26 @@
                                         <th>Categoria</th>
                                         <th>Descrição</th>
                                         <th>Valor</th>
-                                        <th>Ação</th>
                                     </tr>
                                 </thead>
-                                <tbody id="table-body">
-                                </tbody>
+                                <tbody id="table-body"></tbody>
                             </table>
                         </div>
-
                         <div class="pagination">
-                            <button class="btn-pagination" id="btn-prev-page">← Anterior</button>
-                            <span id="pagination-info" class="pagination-info">Página 1 de 1</span>
-                            <button class="btn-pagination" id="btn-next-page">Próxima →</button>
+                            <button type="button" class="btn btn-secondary" id="btn-prev" disabled>← Anterior</button>
+                            <span id="pagination-info">Página 1 de 1</span>
+                            <button type="button" class="btn btn-secondary" id="btn-next" disabled>Próxima →</button>
                         </div>
-                    </section>
-                </div>
+                    </div>
+                </section>
             </div>
         </main>
     </div>
 
-    <!-- Modal para detalhes -->
-    <div id="modal-detalhes" class="modal">
-        <div class="modal-content">
-            <span class="modal-close">&times;</span>
-            <h2 id="modal-titulo">Detalhes da Transação</h2>
-            <div id="modal-body" class="modal-body">
-            </div>
-        </div>
-    </div>
-
-    <!-- Chart.js Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-    <!-- SheetJS Library for XLSX Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+    <script src="supabase-config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
