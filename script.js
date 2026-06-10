@@ -1,371 +1,261 @@
-// Global Variables
+Chart.register(ChartDataLabels);
+
+const PAGE_SIZE = 20;
+const SUPABASE_BATCH_SIZE = 1000;
+const CORES_MODALIDADE = {
+    'NUMERÁRIO': '#1976d2',
+    'AGÊNCIA DE VIAGENS': '#7b1fa2',
+    'CARTÃO CORPORATIVO': '#388e3c'
+};
+const CORES_BARRAS = [
+    'rgba(27, 61, 27, 0.85)',
+    'rgba(45, 80, 22, 0.8)',
+    'rgba(76, 175, 80, 0.75)',
+    'rgba(139, 195, 74, 0.75)',
+    'rgba(255, 152, 0, 0.75)',
+    'rgba(244, 67, 54, 0.75)',
+    'rgba(33, 150, 243, 0.75)',
+    'rgba(156, 39, 176, 0.75)',
+    'rgba(0, 188, 212, 0.75)',
+    'rgba(233, 30, 99, 0.75)',
+    'rgba(63, 81, 181, 0.75)',
+    'rgba(255, 193, 7, 0.75)',
+    'rgba(121, 85, 72, 0.75)',
+    'rgba(96, 125, 139, 0.75)',
+    'rgba(0, 150, 136, 0.75)'
+];
+
 let dados = [];
 let dadosFiltrados = [];
-let dadosFiltradosLancamentos = [];
+let dadosTabela = [];
 let paginaAtual = 1;
-const linhasPorPagina = 20;
-let charts = {
-    categorias: null,
-    linhas: null,
-    departamentos: null,
-    modalidades: null,
-    mensal: null,
-    funcionarios: null
-};
 let modalidadeMode = 'quantidade';
-let mensalStart = null;
-let mensalEnd = null;
+let periodoInicio = null;
+let periodoFim = null;
+let charts = {};
 
-// Inicialização
 document.addEventListener('DOMContentLoaded', async () => {
     inicializarEventos();
     await carregarDados();
-    
-    if (dados.length === 0) {
-        console.warn('Nenhum dado foi carregado');
-        document.getElementById('total-despesas').textContent = 'R$ 0,00';
-        document.getElementById('total-lancamentos').textContent = '0';
-        document.getElementById('ticket-medio').textContent = 'R$ 0,00';
-    } else {
-        atualizarDashboard();
-    }
 });
 
-// Carregar dados do CSV
+function inicializarEventos() {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', e => {
+            e.preventDefault();
+            mudarPagina(item.dataset.page);
+        });
+    });
+
+    document.getElementById('btn-collapse-sidebar').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('collapsed');
+    });
+
+    document.getElementById('btn-toggle-filters').addEventListener('click', () => {
+        document.getElementById('filters-panel').classList.toggle('open');
+    });
+
+    ['filter-categoria', 'filter-departamento', 'filter-funcionario', 'filter-modalidade'].forEach(id => {
+        document.getElementById(id).addEventListener('change', aplicarFiltros);
+    });
+
+    document.getElementById('btn-aplicar-periodo').addEventListener('click', aplicarPeriodo);
+    document.getElementById('btn-limpar-periodo').addEventListener('click', limparPeriodo);
+    document.getElementById('btn-reset-filtros').addEventListener('click', limparFiltros);
+    document.getElementById('search-global').addEventListener('input', aplicarFiltros);
+    document.getElementById('btn-reload').addEventListener('click', carregarDados);
+
+    document.getElementById('btn-modal-quantidade').addEventListener('click', () => setModalidadeMode('quantidade'));
+    document.getElementById('btn-modal-valor').addEventListener('click', () => setModalidadeMode('valor'));
+
+    document.getElementById('search-lancamentos').addEventListener('input', filtrarTabela);
+    document.getElementById('btn-export').addEventListener('click', exportarXlsx);
+    document.getElementById('btn-prev').addEventListener('click', () => mudarPaginaTabela(-1));
+    document.getElementById('btn-next').addEventListener('click', () => mudarPaginaTabela(1));
+}
+
 async function carregarDados() {
+    const badge = document.getElementById('loading-badge');
+    badge.classList.remove('hidden');
+    badge.textContent = 'Carregando...';
+
     try {
-        const response = await fetch('dados.csv');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        if (!validarSupabaseConfig()) {
+            throw new Error('Configure supabase-config.js com URL, chave e tabela.');
         }
-        const buffer = await response.arrayBuffer();
-        const texto = decodeTextBuffer(buffer);
-        dados = parseCSV(texto);
+
+        const registros = await buscarTodosRegistros(badge);
+        dados = registros.map(normalizarRegistro);
         dadosFiltrados = [...dados];
-        dadosFiltradosLancamentos = [...dados];
-        console.log(`${dados.length} registros carregados com sucesso`);
-        
-        if (dados.length === 0) {
-            alert('Nenhum dado foi carregado. Verifique o arquivo dados.csv');
-        } else {
-            preencherFiltros();
-            calcularDatasMensal();
-        }
-    } catch (erro) {
-        console.error('Erro ao carregar dados:', erro);
-        const mensagem = `Erro ao carregar dados do CSV:\n${erro.message}\n\n` +
-            `Se você estiver abrindo o arquivo localmente, pode ser necessário iniciar um servidor local ou selecionar o arquivo manualmente.`;
-        alert(mensagem);
-        abrirSelecionadorCSV();
-    }
-}
+        dadosTabela = [...dados];
 
-function abrirSelecionadorCSV() {
-    const inputCsv = document.getElementById('input-csv');
-    if (inputCsv) {
-        try {
-            inputCsv.click();
-        } catch (erro) {
-            console.warn('Não foi possível abrir automaticamente o seletor de arquivo.', erro);
-        }
-    }
-}
-
-function lerArquivoCSV(arquivo) {
-    const leitor = new FileReader();
-    leitor.onload = (evento) => {
-        const buffer = evento.target.result;
-        const texto = decodeTextBuffer(buffer);
-        dados = parseCSV(texto);
-        dadosFiltrados = [...dados];
-        dadosFiltradosLancamentos = [...dados];
-        
-        if (dados.length === 0) {
-            alert('O arquivo CSV selecionado está vazio ou inválido. Verifique o formato.');
-            return;
-        }
-
+        console.log(`${dados.length} registros carregados do Supabase`);
         preencherFiltros();
-        calcularDatasMensal();
-        atualizarDashboard();
-        atualizarTabela();
-        alert(`Arquivo ${arquivo.name} carregado com sucesso (${dados.length} registros).`);
-    };
-
-    leitor.onerror = () => {
-        alert('Erro ao ler o arquivo CSV. Verifique o arquivo e tente novamente.');
-    };
-
-    leitor.readAsArrayBuffer(arquivo);
-}
-
-function calcularDatasMensal() {
-    if (dados.length === 0) return;
-    const datas = dados.map(d => parseDataBR(d.data)).filter(d => d).sort((a, b) => a - b);
-    if (datas.length > 0) {
-        mensalStart = datas[0];
-        mensalEnd = datas[datas.length - 1];
-        atualizarInputsPeriodo();
+        definirPeriodoPadrao();
+        aplicarFiltros();
+    } catch (erro) {
+        console.error(erro);
+        alert(`Erro ao carregar dados: ${erro.message}`);
+    } finally {
+        badge.classList.add('hidden');
+        badge.textContent = 'Carregando...';
     }
 }
 
-function atualizarInputsPeriodo() {
-    const startValue = mensalStart ? mensalStart.toISOString().split('T')[0] : '';
-    const endValue = mensalEnd ? mensalEnd.toISOString().split('T')[0] : '';
+async function buscarTodosRegistros(badge) {
+    const todos = [];
+    let offset = 0;
+    let total = null;
 
-    ['date-range-start', 'sidebar-date-start'].forEach(id => {
-        const input = document.getElementById(id);
-        if (input) input.value = startValue;
-    });
-    ['date-range-end', 'sidebar-date-end'].forEach(id => {
-        const input = document.getElementById(id);
-        if (input) input.value = endValue;
-    });
-}
+    while (true) {
+        const fim = offset + SUPABASE_BATCH_SIZE - 1;
+        const headers = {
+            ...getSupabaseHeaders(),
+            Range: `${offset}-${fim}`,
+            Prefer: 'count=exact'
+        };
 
-function atualizarPeriodoPorIds(startInputId, endInputId) {
-    const start = document.getElementById(startInputId).value;
-    const end = document.getElementById(endInputId).value;
+        const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=*&order=id.asc`,
+            { headers }
+        );
 
-    mensalStart = start ? new Date(start + 'T00:00:00') : null;
-    mensalEnd = end ? new Date(end + 'T23:59:59') : null;
-    atualizarInputsPeriodo();
-    aplicarFiltros();
-}
+        if (!response.ok) {
+            const erro = await response.text();
+            throw new Error(`HTTP ${response.status}: ${erro || response.statusText}`);
+        }
 
-function decodeTextBuffer(buffer) {
-    const utf8 = new TextDecoder('utf-8').decode(buffer);
-    if (utf8.includes('�')) {
-        try {
-            const cp1252 = new TextDecoder('windows-1252').decode(buffer);
-            if (!cp1252.includes('�')) {
-                return cp1252;
+        const lote = await response.json();
+        if (!Array.isArray(lote)) {
+            throw new Error('Resposta inesperada do Supabase.');
+        }
+
+        todos.push(...lote);
+
+        const contentRange = response.headers.get('Content-Range');
+        if (contentRange) {
+            const parteTotal = contentRange.split('/')[1];
+            if (parteTotal && parteTotal !== '*') {
+                total = parseInt(parteTotal, 10);
             }
-        } catch (erro) {
-            console.warn('Falha ao decodificar como windows-1252', erro);
         }
-    }
-    return utf8;
-}
 
-// Parser do CSV - Versão melhorada
-function parseCSV(texto) {
-    const linhas = texto.trim().split(/\r?\n/);
-    if (linhas.length < 2) {
-        console.warn('CSV vazio ou inválido');
-        return [];
-    }
-
-    const delimitador = detectarDelimitador(linhas[0]);
-    const cabecalhos = parseCSVLine(linhas[0], delimitador);
-    const dados = [];
-
-    for (let i = 1; i < linhas.length; i++) {
-        if (linhas[i].trim() === '') continue;
-        
-        try {
-            const valores = parseCSVLine(linhas[i], delimitador);
-            const objeto = {};
-            
-            cabecalhos.forEach((cabecalho, index) => {
-                objeto[cabecalho] = valores[index] || '';
-            });
-
-            // Normalize modalidade
-            if (objeto.modalidade) objeto.modalidade = normalizeModalidade(objeto.modalidade);
-            
-            dados.push(objeto);
-        } catch (erro) {
-            console.warn(`Erro ao processar linha ${i + 1}:`, erro);
+        if (badge) {
+            badge.textContent = total
+                ? `Carregando... ${todos.length.toLocaleString('pt-BR')} / ${total.toLocaleString('pt-BR')}`
+                : `Carregando... ${todos.length.toLocaleString('pt-BR')}`;
         }
+
+        if (lote.length < SUPABASE_BATCH_SIZE) break;
+        if (total !== null && todos.length >= total) break;
+
+        offset += SUPABASE_BATCH_SIZE;
     }
 
-    return dados;
+    return todos;
 }
 
-function detectarDelimitador(linha) {
-    const countComma = (linha.match(/,/g) || []).length;
-    const countSemicolon = (linha.match(/;/g) || []).length;
-    return countSemicolon > countComma ? ';' : ',';
+function normalizarRegistro(r) {
+    return {
+        data: r.data ? String(r.data) : '',
+        nome_funcionario: r.nome_funcionario || r.funcionario || '',
+        departamento: r.departamento || '',
+        modalidade: normalizarModalidade(r.modalidade || ''),
+        categoria_despesa: r.categoria_despesa || r.categoria || '',
+        descricao_despesa: r.descricao_despesa || r.descricao || '',
+        valor: parseNumero(r.valor ?? r.valor_despesa)
+    };
 }
 
-// Função para fazer parse de uma linha CSV respeitando campos entre aspas
-function parseCSVLine(linha, delimitador = ',') {
-    const resultado = [];
-    let campo = '';
-    let dentro_aspas = false;
-
-    for (let i = 0; i < linha.length; i++) {
-        const caractere = linha[i];
-
-        if (caractere === '"') {
-            dentro_aspas = !dentro_aspas;
-        } else if (caractere === delimitador && !dentro_aspas) {
-            resultado.push(campo.trim());
-            campo = '';
-        } else {
-            campo += caractere;
-        }
-    }
-
-    // Adicionar último campo
-    resultado.push(campo.trim());
-
-    return resultado;
-}
-
-function normalizeModalidade(modal) {
-    if (!modal) return '';
-    const m = modal.toUpperCase().trim();
-    if (m.includes('NUMERÁRIO') || m.includes('NUMERARIO')) return 'NUMERÁRIO';
+function normalizarModalidade(modal) {
+    const m = (modal || '').toUpperCase().trim();
+    if (m.includes('NUMER')) return 'NUMERÁRIO';
     if (m.includes('AGÊNCIA') || m.includes('AGENCIA')) return 'AGÊNCIA DE VIAGENS';
     if (m.includes('CARTÃO') || m.includes('CARTAO') || m.includes('CORPORATIVO')) return 'CARTÃO CORPORATIVO';
     return modal;
 }
 
 function parseNumero(valor) {
-    if (valor === undefined || valor === null || valor === '') {
-        return 0;
-    }
+    if (valor === undefined || valor === null || valor === '') return 0;
+    if (typeof valor === 'number') return Number.isFinite(valor) ? valor : 0;
 
-    const texto = String(valor).trim().replace(/\./g, '').replace(',', '.');
-    const numero = parseFloat(texto);
-    return Number.isNaN(numero) ? 0 : numero;
-}
+    let texto = String(valor).trim().replace(/\s/g, '');
+    const virgula = texto.lastIndexOf(',');
+    const ponto = texto.lastIndexOf('.');
 
-function parseDataBR(valor) {
-    if (!valor) {
-        return null;
-    }
-
-    const partes = valor.split('/').map(p => p.trim());
-    if (partes.length !== 3) {
-        return null;
-    }
-
-    const dia = parseInt(partes[0], 10);
-    const mes = parseInt(partes[1], 10) - 1;
-    const ano = parseInt(partes[2], 10);
-
-    const data = new Date(ano, mes, dia);
-    return Number.isNaN(data.getTime()) ? null : data;
-}
-
-function parseMesPtBr(label) {
-    if (!label) return null;
-    const meses = {
-        jan: 0,
-        fev: 1,
-        mar: 2,
-        abr: 3,
-        mai: 4,
-        jun: 5,
-        jul: 6,
-        ago: 7,
-        set: 8,
-        out: 9,
-        nov: 10,
-        dez: 11
-    };
-    const partes = label.toLowerCase().replace('.', '').split(/\s+/);
-    if (partes.length < 2) return null;
-    const mes = meses[partes[0]];
-    const ano = parseInt(partes[1].replace('.', ''), 10);
-    if (mes === undefined || !Number.isFinite(ano)) return null;
-    return { mes, ano };
-}
-
-// Inicializar eventos
-function inicializarEventos() {
-    // Menu Navigation
-    document.querySelectorAll('.menu-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            const pagina = item.getAttribute('data-page');
-            mudaPagina(pagina);
-        });
-    });
-
-    // Filtros
-    document.getElementById('filter-categoria').addEventListener('change', aplicarFiltros);
-    document.getElementById('filter-departamento').addEventListener('change', aplicarFiltros);
-    document.getElementById('filter-funcionario').addEventListener('change', aplicarFiltros);
-    document.getElementById('filter-modalidade').addEventListener('change', aplicarFiltros);
-    document.getElementById('btn-reset-filtros').addEventListener('click', limparFiltros);
-
-    // Modalidade mode
-    document.getElementById('btn-modal-quantidade').addEventListener('click', () => setModalidadeMode('quantidade'));
-    document.getElementById('btn-modal-valor').addEventListener('click', () => setModalidadeMode('valor'));
-
-    // Upload de CSV
-    document.getElementById('btn-carregar-csv').addEventListener('click', () => {
-        document.getElementById('input-csv').click();
-    });
-    document.getElementById('input-csv').addEventListener('change', (event) => {
-        const arquivo = event.target.files[0];
-        if (arquivo) {
-            lerArquivoCSV(arquivo);
+    if (virgula > -1 && ponto > -1) {
+        // Formato misto: o último separador indica as casas decimais
+        texto = virgula > ponto
+            ? texto.replace(/\./g, '').replace(',', '.')   // BR: 1.234,56
+            : texto.replace(/,/g, '');                        // US: 1,234.56
+    } else if (virgula > -1) {
+        texto = texto.replace(',', '.');                     // BR: 82,76
+    } else if (ponto > -1) {
+        const depoisPonto = texto.slice(ponto + 1);
+        if (depoisPonto.length === 3 && texto.indexOf('.') === ponto) {
+            texto = texto.replace(/\./g, '');                // BR milhar: 1.122
         }
-    });
+        // Caso contrário mantém o ponto como decimal (Supabase): 82.76, 1122.34
+    }
 
-    // Lançamentos
-    document.getElementById('search-lancamentos').addEventListener('input', filtrarTabela);
-    document.querySelector('.search-input').addEventListener('input', aplicarFiltros);
-    document.getElementById('btn-export-csv').addEventListener('click', exportarCSV);
-    document.getElementById('btn-prev-page').addEventListener('click', paginaAnterior);
-    document.getElementById('btn-next-page').addEventListener('click', proximaPagina);
-    document.getElementById('btn-filtrar-mensal').addEventListener('click', () => atualizarPeriodoPorIds('date-range-start', 'date-range-end'));
-    document.getElementById('btn-limpar-periodo').addEventListener('click', limparPeriodo);
-    document.getElementById('btn-aplicar-periodo')?.addEventListener('click', () => atualizarPeriodoPorIds('sidebar-date-start', 'sidebar-date-end'));
-    document.getElementById('btn-limpar-periodo-sidebar')?.addEventListener('click', limparPeriodo);
-
-    // Modal
-    document.querySelector('.modal-close').addEventListener('click', fecharModal);
-    window.addEventListener('click', (e) => {
-        const modal = document.getElementById('modal-detalhes');
-        if (e.target === modal) {
-            fecharModal();
-        }
-    });
-
-    // Preencher filtros
-    preencherFiltros();
-
-    // Interação do gráfico de categorias
-    const chartCategoriasCanvas = document.getElementById('chart-categorias');
-    chartCategoriasCanvas.addEventListener('click', (event) => {
-        if (!charts.categorias) return;
-        const points = charts.categorias.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
-        if (!points.length) return;
-        const index = points[0].index;
-        const categoria = charts.categorias.data.labels[index];
-        if (!categoria) return;
-        const selectCategoria = document.getElementById('filter-categoria');
-        selectCategoria.value = selectCategoria.value === categoria ? '' : categoria;
-        aplicarFiltros();
-    });
+    const n = parseFloat(texto);
+    return Number.isNaN(n) ? 0 : n;
 }
 
-// Filtrar mensal
-function filtrarMensal() {
-    atualizarPeriodoPorIds('date-range-start', 'date-range-end');
+function parseData(valor) {
+    if (!valor) return null;
+    const texto = String(valor).trim();
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(texto)) {
+        const d = new Date(texto + (texto.length === 10 ? 'T00:00:00' : ''));
+        return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    const br = texto.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (br) return new Date(+br[3], +br[2] - 1, +br[1]);
+
+    const d = new Date(texto);
+    return Number.isNaN(d.getTime()) ? null : d;
 }
 
-// Limpar período selecionado
-function limparPeriodo() {
-    mensalStart = null;
-    mensalEnd = null;
-    calcularDatasMensal();
+function validarSupabaseConfig() {
+    return (
+        typeof SUPABASE_URL === 'string' && SUPABASE_URL.includes('supabase.co') &&
+        typeof SUPABASE_ANON_KEY === 'string' && SUPABASE_ANON_KEY.length > 20 &&
+        typeof SUPABASE_TABLE === 'string' && SUPABASE_TABLE.trim().length > 0
+    );
+}
+
+function definirPeriodoPadrao() {
+    if (!dados.length) return;
+    const datas = dados.map(d => parseData(d.data)).filter(Boolean).sort((a, b) => a - b);
+    if (!datas.length) return;
+    periodoInicio = datas[0];
+    periodoFim = datas[datas.length - 1];
+    sincronizarInputsPeriodo();
+}
+
+function sincronizarInputsPeriodo() {
+    document.getElementById('filter-date-start').value = periodoInicio
+        ? periodoInicio.toISOString().split('T')[0] : '';
+    document.getElementById('filter-date-end').value = periodoFim
+        ? periodoFim.toISOString().split('T')[0] : '';
+}
+
+function aplicarPeriodo() {
+    const start = document.getElementById('filter-date-start').value;
+    const end = document.getElementById('filter-date-end').value;
+    periodoInicio = start ? new Date(start + 'T00:00:00') : null;
+    periodoFim = end ? new Date(end + 'T23:59:59') : null;
     aplicarFiltros();
 }
 
-// Preencher dropdowns de filtros
-function preencherFiltros() {
-    if (!dados || dados.length === 0) {
-        console.warn('Sem dados para preencher filtros');
-        return;
-    }
+function limparPeriodo() {
+    definirPeriodoPadrao();
+    aplicarFiltros();
+}
 
+function preencherFiltros() {
     const categorias = [...new Set(dados.map(d => d.categoria_despesa).filter(Boolean))].sort();
     const departamentos = [...new Set(dados.map(d => d.departamento).filter(Boolean))].sort();
     const funcionarios = [...new Set(dados.map(d => d.nome_funcionario).filter(Boolean))].sort();
@@ -375,166 +265,218 @@ function preencherFiltros() {
     preencherSelect('filter-funcionario', funcionarios);
 }
 
-function preencherSelect(selectId, opcoes) {
-    const select = document.getElementById(selectId);
-    opcoes.forEach(opcao => {
-        const option = document.createElement('option');
-        option.value = opcao;
-        option.textContent = opcao;
-        select.appendChild(option);
+function preencherSelect(id, opcoes) {
+    const select = document.getElementById(id);
+    const atual = select.value;
+    const primeira = select.options[0];
+    select.innerHTML = '';
+    select.appendChild(primeira);
+    opcoes.forEach(op => {
+        const opt = document.createElement('option');
+        opt.value = op;
+        opt.textContent = op;
+        select.appendChild(opt);
     });
+    if ([...select.options].some(o => o.value === atual)) select.value = atual;
 }
 
-// Aplicar filtros
 function aplicarFiltros() {
     const categoria = document.getElementById('filter-categoria').value;
     const departamento = document.getElementById('filter-departamento').value;
     const funcionario = document.getElementById('filter-funcionario').value;
     const modalidade = document.getElementById('filter-modalidade').value;
-    const termoBusca = document.querySelector('.search-input').value.trim().toLowerCase();
+    const busca = document.getElementById('search-global').value.trim().toLowerCase();
 
     dadosFiltrados = dados.filter(d => {
-        const matchCategoria = !categoria || d.categoria_despesa === categoria;
-        const matchDepartamento = !departamento || d.departamento === departamento;
-        const matchFuncionario = !funcionario || d.nome_funcionario === funcionario;
-        const matchModalidade = !modalidade || d.modalidade === modalidade;
+        if (categoria && d.categoria_despesa !== categoria) return false;
+        if (departamento && d.departamento !== departamento) return false;
+        if (funcionario && d.nome_funcionario !== funcionario) return false;
+        if (modalidade && d.modalidade !== modalidade) return false;
 
-        const matchBusca = !termoBusca ||
-            (d.nome_funcionario && d.nome_funcionario.toLowerCase().includes(termoBusca)) ||
-            (d.departamento && d.departamento.toLowerCase().includes(termoBusca));
-
-        // Incluir filtro de período
-        let matchPeriodo = true;
-        if (mensalStart || mensalEnd) {
-            const data = parseDataBR(d.data);
-            matchPeriodo = data && (!mensalStart || data >= mensalStart) && (!mensalEnd || data <= mensalEnd);
+        if (busca) {
+            const texto = `${d.nome_funcionario} ${d.departamento} ${d.categoria_despesa} ${d.descricao_despesa}`.toLowerCase();
+            if (!texto.includes(busca)) return false;
         }
 
-        return matchCategoria && matchDepartamento && matchFuncionario && matchModalidade && matchBusca && matchPeriodo;
+        if (periodoInicio || periodoFim) {
+            const data = parseData(d.data);
+            if (!data) return false;
+            if (periodoInicio && data < periodoInicio) return false;
+            if (periodoFim && data > periodoFim) return false;
+        }
+
+        return true;
     });
 
-    dadosFiltradosLancamentos = [...dadosFiltrados];
+    dadosTabela = [...dadosFiltrados];
     paginaAtual = 1;
+    atualizarChipsFiltros();
     atualizarDashboard();
     atualizarTabela();
 }
 
-// Limpar filtros
 function limparFiltros() {
     document.getElementById('filter-categoria').value = '';
     document.getElementById('filter-departamento').value = '';
     document.getElementById('filter-funcionario').value = '';
     document.getElementById('filter-modalidade').value = '';
-    document.querySelector('.search-input').value = '';
-    
-    // Limpar também o período mensal
-    mensalStart = null;
-    mensalEnd = null;
-    calcularDatasMensal();
-    
-    dadosFiltrados = [...dados];
-    dadosFiltradosLancamentos = [...dados];
-    paginaAtual = 1;
-    atualizarDashboard();
-    atualizarTabela();
+    document.getElementById('search-global').value = '';
+    definirPeriodoPadrao();
+    aplicarFiltros();
 }
 
-// Atualizar Dashboard
+function atualizarChipsFiltros() {
+    const container = document.getElementById('active-filters');
+    const chips = [];
+
+    const add = (label, clearFn) => {
+        const chip = document.createElement('span');
+        chip.className = 'filter-chip';
+        chip.innerHTML = `${label} <button type="button" aria-label="Remover filtro">×</button>`;
+        chip.querySelector('button').addEventListener('click', clearFn);
+        chips.push(chip);
+    };
+
+    const cat = document.getElementById('filter-categoria').value;
+    const dep = document.getElementById('filter-departamento').value;
+    const func = document.getElementById('filter-funcionario').value;
+    const mod = document.getElementById('filter-modalidade').value;
+
+    if (cat) add(`Categoria: ${cat}`, () => { document.getElementById('filter-categoria').value = ''; aplicarFiltros(); });
+    if (dep) add(`Departamento: ${dep}`, () => { document.getElementById('filter-departamento').value = ''; aplicarFiltros(); });
+    if (func) add(`Funcionário: ${func}`, () => { document.getElementById('filter-funcionario').value = ''; aplicarFiltros(); });
+    if (mod) add(`Modalidade: ${mod}`, () => { document.getElementById('filter-modalidade').value = ''; aplicarFiltros(); });
+
+    container.innerHTML = '';
+    chips.forEach(c => container.appendChild(c));
+    container.classList.toggle('hidden', chips.length === 0);
+}
+
+function toggleFiltroSelect(id, valor) {
+    const select = document.getElementById(id);
+    select.value = select.value === valor ? '' : valor;
+    aplicarFiltros();
+}
+
 function atualizarDashboard() {
-    atualizarCards();
-    atualizarGraficos();
+    atualizarKpis();
+    atualizarGraficoModalidade();
+    atualizarGraficoBarras('categorias', 'categoria_despesa', 'chart-categorias', 10, 'filter-categoria');
+    atualizarGraficoBarras('departamentos', 'departamento', 'chart-departamentos', 10, 'filter-departamento');
+    atualizarGraficoBarras('funcionarios', 'nome_funcionario', 'chart-funcionarios', 15, 'filter-funcionario');
+    atualizarGraficoMensal();
 }
 
-// Atualizar Cards
-function atualizarCards() {
-    const totalDespesas = dadosFiltrados.reduce((sum, d) => sum + parseNumero(d.valor), 0);
-    const totalLancamentos = dadosFiltrados.length;
-    const ticketMedio = totalLancamentos > 0 ? totalDespesas / totalLancamentos : 0;
+function atualizarKpis() {
+    const total = dadosFiltrados.reduce((s, d) => s + d.valor, 0);
+    const qtd = dadosFiltrados.length;
+    const ticket = qtd > 0 ? total / qtd : 0;
 
-    // Contar por modalidade
-    const modalidades = {};
+    document.getElementById('total-despesas').textContent = formatarMoeda(total);
+    document.getElementById('total-lancamentos').textContent = qtd.toLocaleString('pt-BR');
+    document.getElementById('ticket-medio').textContent = formatarMoeda(ticket);
+
+    const mods = { 'CARTÃO CORPORATIVO': 0, 'NUMERÁRIO': 0, 'AGÊNCIA DE VIAGENS': 0 };
     dadosFiltrados.forEach(d => {
-        const chave = d.modalidade || 'OUTROS';
-        if (!modalidades[chave]) modalidades[chave] = 0;
-        if (modalidadeMode === 'valor') {
-            modalidades[chave] += parseNumero(d.valor);
-        } else {
-            modalidades[chave] += 1;
+        if (mods[d.modalidade] !== undefined) {
+            mods[d.modalidade] += modalidadeMode === 'valor' ? d.valor : 1;
         }
     });
 
-    // Atualizar elementos
-    document.getElementById('total-despesas').textContent = formatarMoeda(totalDespesas);
-    document.getElementById('total-lancamentos').textContent = totalLancamentos.toLocaleString('pt-BR');
-    document.getElementById('ticket-medio').textContent = formatarMoeda(ticketMedio);
-
-    const cartao = modalidades['CARTÃO CORPORATIVO'] || modalidades['CARTÃO CORP.'] || 0;
-    const numerario = modalidades['NUMERÁRIO'] || modalidades['NUMERARIO'] || 0;
-    const agencia = modalidades['AGÊNCIA DE VIAGENS'] || modalidades['AGENCIA VIAGEM'] || modalidades['AGÊNCIA VIAGEM'] || 0;
-
-    document.getElementById('modal-cartao').textContent = modalidadeMode === 'valor'
-        ? formatarMoeda(cartao)
-        : cartao.toLocaleString('pt-BR');
-    document.getElementById('modal-numerario').textContent = modalidadeMode === 'valor'
-        ? formatarMoeda(numerario)
-        : numerario.toLocaleString('pt-BR');
-    document.getElementById('modal-agencia').textContent = modalidadeMode === 'valor'
-        ? formatarMoeda(agencia)
-        : agencia.toLocaleString('pt-BR');
-
-    const footerText = modalidadeMode === 'valor'
-        ? 'Exibe soma de valores por modalidade'
-        : 'Exibe quantidade de lançamentos por modalidade';
-    document.getElementById('modalidade-footer').textContent = footerText;
+    const fmt = v => modalidadeMode === 'valor' ? formatarMoeda(v) : v.toLocaleString('pt-BR');
+    document.getElementById('modal-cartao').textContent = fmt(mods['CARTÃO CORPORATIVO']);
+    document.getElementById('modal-numerario').textContent = fmt(mods['NUMERÁRIO']);
+    document.getElementById('modal-agencia').textContent = fmt(mods['AGÊNCIA DE VIAGENS']);
 }
 
 function setModalidadeMode(mode) {
     modalidadeMode = mode;
     document.getElementById('btn-modal-quantidade').classList.toggle('active', mode === 'quantidade');
     document.getElementById('btn-modal-valor').classList.toggle('active', mode === 'valor');
-    atualizarCards();
+    atualizarKpis();
 }
 
-// Atualizar Gráficos
-function atualizarGraficos() {
-    atualizarGraficoCategoria();
-    atualizarGraficoDepartamento();
-    atualizarGraficoFuncionario();
-    atualizarGraficoModalidade();
-    atualizarGraficoMensal();
-}
-
-// Gráfico de Categorias (Barras Horizontais)
-function atualizarGraficoCategoria() {
-    const categorias = {};
+function agruparPor(campo) {
+    const mapa = {};
     dadosFiltrados.forEach(d => {
-        categorias[d.categoria_despesa] = (categorias[d.categoria_despesa] || 0) + parseNumero(d.valor);
+        const chave = d[campo] || 'Outros';
+        mapa[chave] = (mapa[chave] || 0) + d.valor;
+    });
+    return Object.entries(mapa).sort((a, b) => b[1] - a[1]);
+}
+
+function atualizarGraficoModalidade() {
+    const mapa = { 'NUMERÁRIO': 0, 'AGÊNCIA DE VIAGENS': 0, 'CARTÃO CORPORATIVO': 0 };
+    dadosFiltrados.forEach(d => {
+        if (mapa[d.modalidade] !== undefined) mapa[d.modalidade] += d.valor;
     });
 
-    const labels = Object.keys(categorias).sort((a, b) => categorias[b] - categorias[a]);
-    const dados_valores = labels.map(l => categorias[l]);
-    const cores = gerarCores(labels.length);
+    const labels = Object.keys(mapa);
+    const valores = Object.values(mapa);
+    const cores = labels.map(l => CORES_MODALIDADE[l] || '#94a3b8');
+    const total = valores.reduce((s, v) => s + v, 0);
 
-    const canvasCategorias = document.getElementById('chart-categorias');
-    canvasCategorias.style.height = '320px';
-    canvasCategorias.height = 320;
-    const ctx = canvasCategorias.getContext('2d');
-    
-    if (charts.categorias) {
-        charts.categorias.destroy();
-    }
+    destruirChart('modalidades');
+    const ctx = document.getElementById('chart-modalidades').getContext('2d');
+    charts.modalidades = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: valores, backgroundColor: cores, borderWidth: 2, borderColor: '#fff' }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '42%',
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    color: '#fff',
+                    font: { weight: 'bold', size: 13 },
+                    formatter: (v) => total > 0 ? `${((v / total) * 100).toFixed(1)}%` : '',
+                    display: ctx => ctx.dataset.data[ctx.dataIndex] > 0
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.label}: ${formatarMoeda(ctx.raw)} (${total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0}%)`
+                    }
+                }
+            },
+            onClick: (_, elements) => {
+                if (!elements.length) return;
+                toggleFiltroSelect('filter-modalidade', labels[elements[0].index]);
+            }
+        }
+    });
 
-    charts.categorias = new Chart(ctx, {
+    atualizarLegendaModalidade(labels, cores, valores, total);
+}
+
+function atualizarLegendaModalidade(labels, cores, valores, total) {
+    const el = document.getElementById('legend-modalidades');
+    el.innerHTML = labels.map((l, i) => {
+        const pct = total > 0 ? ((valores[i] / total) * 100).toFixed(1) : 0;
+        return `<div class="legend-item"><span class="legend-dot" style="background:${cores[i]}"></span>${l} — ${formatarMoeda(valores[i])} (${pct}%)</div>`;
+    }).join('');
+}
+
+function atualizarGraficoBarras(chave, campo, canvasId, limite, filtroId) {
+    const agrupado = agruparPor(campo).slice(0, limite);
+    const labels = agrupado.map(([k]) => k);
+    const valores = agrupado.map(([, v]) => v);
+    const cores = labels.map((_, i) => CORES_BARRAS[i % CORES_BARRAS.length]);
+
+    destruirChart(chave);
+    const canvas = document.getElementById(canvasId);
+    const altura = Math.max(260, labels.length * 28);
+    canvas.parentElement.style.height = altura + 'px';
+
+    charts[chave] = new Chart(canvas.getContext('2d'), {
         type: 'bar',
         data: {
-            labels: labels,
+            labels,
             datasets: [{
-                label: 'Despesas (R$)',
-                data: dados_valores,
+                data: valores,
                 backgroundColor: cores,
-                borderColor: cores.map(c => c.replace('0.7', '1')),
-                borderWidth: 2,
-                borderRadius: 6
+                borderRadius: 6,
+                borderSkipped: false
             }]
         },
         options: {
@@ -542,509 +484,151 @@ function atualizarGraficoCategoria() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
+                legend: { display: false },
+                datalabels: { display: false },
+                tooltip: {
+                    callbacks: { label: ctx => formatarMoeda(ctx.raw) }
                 }
             },
             scales: {
                 x: {
                     beginAtZero: true,
                     ticks: {
-                        callback: function(value) {
-                            return 'R$ ' + value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-                        }
-                    }
+                        callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
+                    },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11 } }
                 }
+            },
+            onClick: (_, elements) => {
+                if (!elements.length) return;
+                toggleFiltroSelect(filtroId, labels[elements[0].index]);
             }
         }
     });
-
-    atualizarLegenda('legend-categorias', labels, cores);
 }
 
-// Gráfico de Linhas (Tendência por Mês)
-function atualizarGraficoLinhas() {
+function atualizarGraficoMensal() {
     const meses = {};
-    const mesesOrdenados = [];
-    
     dadosFiltrados.forEach(d => {
-        const data = parseDataBR(d.data);
+        const data = parseData(d.data);
         if (!data) return;
-        const mesChave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
-        if (!meses[mesChave]) {
-            meses[mesChave] = 0;
-        }
-        meses[mesChave] += parseNumero(d.valor);
+        const chave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+        meses[chave] = (meses[chave] || 0) + d.valor;
     });
 
-    const chavesOrdenadas = Object.keys(meses).sort();
-    const valores = chavesOrdenadas.map(k => meses[k]);
-
-    // Formatar labels de mês
-    const labels = chavesOrdenadas.map(k => {
+    const chaves = Object.keys(meses).sort();
+    const labels = chaves.map(k => {
         const [ano, mes] = k.split('-');
-        const nomeMes = new Date(ano, mes - 1).toLocaleString('pt-BR', { month: 'short', year: '2-digit' });
-        return nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+        const nome = new Date(+ano, +mes - 1).toLocaleString('pt-BR', { month: 'short', year: 'numeric' });
+        return nome.charAt(0).toUpperCase() + nome.slice(1);
     });
+    const valores = chaves.map(k => meses[k]);
 
-    const ctx = document.getElementById('chart-linhas').getContext('2d');
-    
-    if (charts.linhas) {
-        charts.linhas.destroy();
-    }
-
-    charts.linhas = new Chart(ctx, {
+    destruirChart('mensal');
+    charts.mensal = new Chart(document.getElementById('chart-mensal').getContext('2d'), {
         type: 'line',
         data: {
-            labels: labels,
+            labels,
             datasets: [{
-                label: 'Despesas (R$)',
+                label: 'Despesas',
                 data: valores,
-                borderColor: '#2d5016',
-                backgroundColor: 'rgba(45, 80, 22, 0.1)',
+                borderColor: '#1b3d1b',
+                backgroundColor: 'rgba(76, 175, 80, 0.15)',
                 borderWidth: 3,
                 fill: true,
-                tension: 0.4,
-                pointRadius: 6,
-                pointBackgroundColor: '#2d5016',
+                tension: 0.35,
+                pointRadius: 5,
+                pointBackgroundColor: '#1b3d1b',
                 pointBorderColor: '#fff',
                 pointBorderWidth: 2,
-                pointHoverRadius: 8
+                pointHoverRadius: 7
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
+                legend: { display: false },
+                datalabels: { display: false },
+                tooltip: {
+                    callbacks: { label: ctx => formatarMoeda(ctx.raw) }
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        callback: function(value) {
-                            return 'R$ ' + value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    atualizarLegenda('legend-linhas', ['Despesas'], ['#2d5016']);
-}
-
-// Gráfico de Departamentos
-function atualizarGraficoDepartamento() {
-    const departamentos = {};
-    dadosFiltrados.forEach(d => {
-        const dep = d.departamento || 'OUTROS';
-        departamentos[dep] = (departamentos[dep] || 0) + parseNumero(d.valor);
-    });
-
-    const labels = Object.keys(departamentos).sort((a, b) => departamentos[b] - departamentos[a]).slice(0, 10);
-    const dados_valores = labels.map(l => departamentos[l]);
-    const cores = gerarCores(labels.length);
-
-    const canvasDepartamentos = document.getElementById('chart-departamentos');
-    canvasDepartamentos.style.height = '320px';
-    canvasDepartamentos.height = 320;
-    const ctx = canvasDepartamentos.getContext('2d');
-    
-    if (charts.departamentos) {
-        charts.departamentos.destroy();
-    }
-
-    charts.departamentos = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Despesas (R$)',
-                data: dados_valores,
-                backgroundColor: cores,
-                borderColor: cores.map(c => c.replace('0.7', '1')),
-                borderWidth: 2,
-                borderRadius: 6
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return 'R$ ' + value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    const departamentoCanvas = document.getElementById('chart-departamentos');
-    departamentoCanvas.onclick = (event) => {
-        if (!charts.departamentos) return;
-        const points = charts.departamentos.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
-        if (!points.length) return;
-        const index = points[0].index;
-        const departamento = charts.departamentos.data.labels[index];
-        if (!departamento) return;
-        const selectDepartamento = document.getElementById('filter-departamento');
-        selectDepartamento.value = selectDepartamento.value === departamento ? '' : departamento;
-        aplicarFiltros();
-    };
-
-    atualizarLegenda('legend-departamentos', labels, cores);
-}
-
-// Gráfico de Funcionários
-function atualizarGraficoFuncionario() {
-    const funcionarios = {};
-    dadosFiltrados.forEach(d => {
-        const func = d.nome_funcionario || 'OUTROS';
-        funcionarios[func] = (funcionarios[func] || 0) + parseNumero(d.valor);
-    });
-
-    const labels = Object.keys(funcionarios).sort((a, b) => funcionarios[b] - funcionarios[a]).slice(0, 10);
-    const dados_valores = labels.map(l => funcionarios[l]);
-    const cores = gerarCores(labels.length);
-
-    const canvasFuncionarios = document.getElementById('chart-funcionarios');
-    canvasFuncionarios.style.height = '320px';
-    canvasFuncionarios.height = 320;
-    const ctx = canvasFuncionarios.getContext('2d');
-    
-    if (charts.funcionarios) {
-        charts.funcionarios.destroy();
-    }
-
-    charts.funcionarios = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Despesas (R$)',
-                data: dados_valores,
-                backgroundColor: cores,
-                borderColor: cores.map(c => c.replace('0.7', '1')),
-                borderWidth: 2,
-                borderRadius: 6
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return 'R$ ' + value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    const funcionarioCanvas = document.getElementById('chart-funcionarios');
-    funcionarioCanvas.onclick = (event) => {
-        if (!charts.funcionarios) return;
-        const points = charts.funcionarios.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
-        if (!points.length) return;
-        const index = points[0].index;
-        const funcionario = charts.funcionarios.data.labels[index];
-        if (!funcionario) return;
-        const selectFuncionario = document.getElementById('filter-funcionario');
-        selectFuncionario.value = selectFuncionario.value === funcionario ? '' : funcionario;
-        aplicarFiltros();
-    };
-
-    atualizarLegenda('legend-funcionarios', labels, cores);
-}
-
-// Gráfico Linha Mensal
-function atualizarGraficoMensal() {
-    let dadosMensal = dadosFiltrados;
-    if (mensalStart && mensalEnd) {
-        dadosMensal = dadosFiltrados.filter(d => {
-            const data = parseDataBR(d.data);
-            return data && data >= mensalStart && data <= mensalEnd;
-        });
-    }
-
-    const meses = {};
-    dadosMensal.forEach(d => {
-        const data = parseDataBR(d.data);
-        if (!data) return;
-        const mesChave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
-        meses[mesChave] = (meses[mesChave] || 0) + parseNumero(d.valor);
-    });
-
-    const chavesOrdenadas = Object.keys(meses).sort();
-    const labels = chavesOrdenadas.map(k => {
-        const [ano, mes] = k.split('-');
-        return new Date(ano, mes - 1).toLocaleString('pt-BR', { month: 'short', year: 'numeric' });
-    });
-    const valores = chavesOrdenadas.map(k => meses[k]);
-    const canvasMensal = document.getElementById('chart-mensal');
-    canvasMensal.style.height = '320px';
-    canvasMensal.height = 320;
-    const ctx = canvasMensal.getContext('2d');
-
-    if (charts.mensal) {
-        charts.mensal.destroy();
-    }
-
-    charts.mensal = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Despesas por mês',
-                data: valores,
-                borderColor: '#2d5016',
-                backgroundColor: 'rgba(45, 80, 22, 0.12)',
-                borderWidth: 3,
-                tension: 0.35,
-                fill: true,
-                pointRadius: 5,
-                pointBackgroundColor: '#2d5016'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: (value) => 'R$ ' + Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
-                    }
-                }
-            }
-        }
-    });
-
-    const mensalCanvas = document.getElementById('chart-mensal');
-    mensalCanvas.onclick = (event) => {
-        if (!charts.mensal) return;
-        const points = charts.mensal.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
-        if (!points.length) return;
-        const index = points[0].index;
-        const label = charts.mensal.data.labels[index];
-        const mesSelecionado = parseMesPtBr(label);
-        if (!mesSelecionado) return;
-        const start = new Date(mesSelecionado.ano, mesSelecionado.mes, 1);
-        const end = new Date(mesSelecionado.ano, mesSelecionado.mes + 1, 0, 23, 59, 59);
-        mensalStart = start;
-        mensalEnd = end;
-        document.getElementById('date-range-start').value = start.toISOString().split('T')[0];
-        document.getElementById('date-range-end').value = end.toISOString().split('T')[0];
-        aplicarFiltros();
-    };
-
-    atualizarLegenda('legend-mensal', ['Despesas mensais'], ['rgba(45, 80, 22, 0.7)']);
-}
-
-// Gráfico de Modalidades
-function atualizarGraficoModalidade() {
-    const modalidades = {
-        'NUMERÁRIO': 0,
-        'AGÊNCIA DE VIAGENS': 0,
-        'CARTÃO CORPORATIVO': 0
-    };
-
-    dadosFiltrados.forEach(d => {
-        if (modalidades.hasOwnProperty(d.modalidade)) {
-            modalidades[d.modalidade] += parseNumero(d.valor);
-        }
-    });
-
-    const labels = Object.keys(modalidades);
-    const dados_valores = Object.values(modalidades);
-    const cores = ['#1976d2', '#7b1fa2', '#388e3c'];
-
-    const canvasModalidades = document.getElementById('chart-modalidades');
-    canvasModalidades.style.height = '320px';
-    canvasModalidades.height = 320;
-    const ctx = canvasModalidades.getContext('2d');
-    
-    if (charts.modalidades) {
-        charts.modalidades.destroy();
-    }
-
-    charts.modalidades = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: dados_valores,
-                backgroundColor: cores,
-                borderColor: '#fff',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
+                        callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
+                    },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
                 },
-                datalabels: {
-                    formatter: (value, ctx) => {
-                        let sum = 0;
-                        ctx.dataset.data.forEach(v => sum += v);
-                        return value > 0 ? ((value / sum) * 100).toFixed(1) + '%' : '';
-                    },
-                    color: '#fff',
-                    font: {
-                        size: 16,
-                        weight: 'bold'
-                    },
-                    anchor: 'center',
-                    align: 'center',
-                    clamp: true,
-                    offset: 0,
-                    display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0
-                }
+                x: { grid: { display: false } }
+            },
+            onClick: (_, elements) => {
+                if (!elements.length) return;
+                const idx = elements[0].index;
+                const [ano, mes] = chaves[idx].split('-');
+                periodoInicio = new Date(+ano, +mes - 1, 1);
+                periodoFim = new Date(+ano, +mes, 0, 23, 59, 59);
+                sincronizarInputsPeriodo();
+                aplicarFiltros();
             }
         }
     });
-
-    const modalidadesCanvas = document.getElementById('chart-modalidades');
-    modalidadesCanvas.onclick = (event) => {
-        if (!charts.modalidades) return;
-        const points = charts.modalidades.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
-        if (!points.length) return;
-        const index = points[0].index;
-        const modalidade = charts.modalidades.data.labels[index];
-        if (!modalidade) return;
-        const selectModalidade = document.getElementById('filter-modalidade');
-        selectModalidade.value = selectModalidade.value === modalidade ? '' : modalidade;
-        aplicarFiltros();
-    };
-
-    atualizarLegenda('legend-modalidades', labels, cores.map(c => c));
 }
 
-// Atualizar Legenda
-function atualizarLegenda(elementId, labels, cores) {
-    const legend = document.getElementById(elementId);
-    legend.innerHTML = '';
-    
-    labels.forEach((label, index) => {
-        const item = document.createElement('div');
-        item.className = 'legend-item';
-        
-        const cor = document.createElement('div');
-        cor.className = 'legend-color';
-        cor.style.backgroundColor = cores[index].replace('0.7', '1');
-        
-        const texto = document.createElement('span');
-        texto.textContent = label;
-        
-        item.appendChild(cor);
-        item.appendChild(texto);
-        legend.appendChild(item);
-    });
-}
-
-// Gerar cores para gráficos
-function gerarCores(quantidade) {
-    const coresPaleta = [
-        'rgba(45, 80, 22, 0.7)',
-        'rgba(76, 175, 80, 0.7)',
-        'rgba(255, 152, 0, 0.7)',
-        'rgba(244, 67, 54, 0.7)',
-        'rgba(33, 150, 243, 0.7)',
-        'rgba(156, 39, 176, 0.7)',
-        'rgba(0, 188, 212, 0.7)',
-        'rgba(255, 193, 7, 0.7)',
-        'rgba(63, 81, 181, 0.7)',
-        'rgba(233, 30, 99, 0.7)'
-    ];
-
-    const cores = [];
-    for (let i = 0; i < quantidade; i++) {
-        cores.push(coresPaleta[i % coresPaleta.length]);
+function destruirChart(nome) {
+    if (charts[nome]) {
+        charts[nome].destroy();
+        charts[nome] = null;
     }
-    return cores;
 }
 
-// Atualizar Tabela de Lançamentos
 function atualizarTabela() {
-    const inicio = (paginaAtual - 1) * linhasPorPagina;
-    const fim = inicio + linhasPorPagina;
-    const registrosPagina = dadosFiltradosLancamentos.slice(inicio, fim);
-
+    const inicio = (paginaAtual - 1) * PAGE_SIZE;
+    const pagina = dadosTabela.slice(inicio, inicio + PAGE_SIZE);
     const tbody = document.getElementById('table-body');
-    tbody.innerHTML = '';
 
-    registrosPagina.forEach((registro, index) => {
-        const tr = document.createElement('tr');
-        
-        // Formatar data
-        const data = parseDataBR(registro.data);
-        const dataFormatada = data ? data.toLocaleDateString('pt-BR') : 'Data inválida';
-        
-        // Classe para modalidade
-        let classeModalidade = 'modal-numerario';
-        if (registro.modalidade === 'AGÊNCIA DE VIAGENS') classeModalidade = 'modal-agencia';
-        else if (registro.modalidade === 'CARTÃO CORPORATIVO') classeModalidade = 'modal-cartao';
+    if (!pagina.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#64748b">Nenhum lançamento encontrado</td></tr>';
+    } else {
+        tbody.innerHTML = pagina.map(r => {
+            const data = parseData(r.data);
+            const dataFmt = data ? data.toLocaleDateString('pt-BR') : r.data;
+            const badge = badgeModalidade(r.modalidade);
+            return `<tr>
+                <td>${dataFmt}</td>
+                <td>${esc(r.nome_funcionario)}</td>
+                <td>${esc(r.departamento)}</td>
+                <td>${badge}</td>
+                <td>${esc(r.categoria_despesa)}</td>
+                <td>${esc(r.descricao_despesa)}</td>
+                <td class="valor-cell">${formatarMoeda(r.valor)}</td>
+            </tr>`;
+        }).join('');
+    }
 
-        tr.innerHTML = `
-            <td>${dataFormatada}</td>
-            <td>${registro.nome_funcionario}</td>
-            <td>${registro.departamento}</td>
-            <td><span class="table-modalidade ${classeModalidade}">${registro.modalidade}</span></td>
-            <td><span class="table-categoria">${registro.categoria_despesa}</span></td>
-            <td>${registro.descricao_despesa}</td>
-            <td><strong>R$ ${parseNumero(registro.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
-            <td>
-                <button class="btn-detalhes" onclick="mostrarDetalhes('${index}')">Ver</button>
-            </td>
-        `;
-        
-        tbody.appendChild(tr);
-    });
-
-    // Atualizar paginação
-    const totalPaginas = Math.ceil(dadosFiltradosLancamentos.length / linhasPorPagina);
-    document.getElementById('pagination-info').textContent = 
-        `Página ${paginaAtual} de ${totalPaginas}`;
-    
-    document.getElementById('btn-prev-page').disabled = paginaAtual === 1;
-    document.getElementById('btn-next-page').disabled = paginaAtual === totalPaginas;
+    const totalPaginas = Math.max(1, Math.ceil(dadosTabela.length / PAGE_SIZE));
+    document.getElementById('pagination-info').textContent =
+        `Página ${paginaAtual} de ${totalPaginas} (${dadosTabela.length} registros)`;
+    document.getElementById('btn-prev').disabled = paginaAtual <= 1;
+    document.getElementById('btn-next').disabled = paginaAtual >= totalPaginas;
 }
 
-// Filtrar tabela por busca
+function badgeModalidade(mod) {
+    let cls = 'badge-numerario';
+    if (mod === 'AGÊNCIA DE VIAGENS') cls = 'badge-agencia';
+    else if (mod === 'CARTÃO CORPORATIVO') cls = 'badge-cartao';
+    return `<span class="badge ${cls}">${esc(mod)}</span>`;
+}
+
 function filtrarTabela() {
     const busca = document.getElementById('search-lancamentos').value.toLowerCase();
-    dadosFiltradosLancamentos = dadosFiltrados.filter(d => {
+    dadosTabela = dadosFiltrados.filter(d => {
         const texto = `${d.data} ${d.nome_funcionario} ${d.departamento} ${d.modalidade} ${d.categoria_despesa} ${d.descricao_despesa} ${d.valor}`.toLowerCase();
         return texto.includes(busca);
     });
@@ -1052,167 +636,45 @@ function filtrarTabela() {
     atualizarTabela();
 }
 
-// Paginação
-function proximaPagina() {
-    const totalPaginas = Math.ceil(dadosFiltradosLancamentos.length / linhasPorPagina);
-    if (paginaAtual < totalPaginas) {
-        paginaAtual++;
-        atualizarTabela();
-        document.querySelector('.table-wrapper').scrollTop = 0;
-    }
+function mudarPaginaTabela(delta) {
+    const total = Math.ceil(dadosTabela.length / PAGE_SIZE);
+    paginaAtual = Math.min(Math.max(1, paginaAtual + delta), total);
+    atualizarTabela();
+    document.querySelector('.table-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function paginaAnterior() {
-    if (paginaAtual > 1) {
-        paginaAtual--;
-        atualizarTabela();
-        document.querySelector('.table-wrapper').scrollTop = 0;
-    }
+function mudarPagina(pagina) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === pagina));
+    document.getElementById('page-dashboard').classList.toggle('active', pagina === 'dashboard');
+    document.getElementById('page-lancamentos').classList.toggle('active', pagina === 'lancamentos');
+    if (pagina === 'lancamentos') atualizarTabela();
 }
 
-// Mostrar Detalhes em Modal
-function mostrarDetalhes(index) {
-    const inicio = (paginaAtual - 1) * linhasPorPagina;
-    const registro = dadosFiltrados[inicio + parseInt(index)];
-
-    if (!registro) return;
-
-    const data = parseDataBR(registro.data);
-    const dataFormatada = data ? data.toLocaleDateString('pt-BR') : 'Data inválida';
-    const valorFormatado = parseNumero(registro.valor).toLocaleString('pt-BR', { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
+function exportarXlsx() {
+    const rows = dadosFiltrados.map(d => {
+        const data = parseData(d.data);
+        return {
+            Data: data ? data.toLocaleDateString('pt-BR') : d.data,
+            Funcionário: d.nome_funcionario,
+            Departamento: d.departamento,
+            Modalidade: d.modalidade,
+            Categoria: d.categoria_despesa,
+            Descrição: d.descricao_despesa,
+            Valor: d.valor
+        };
     });
-
-    const modalBody = document.getElementById('modal-body');
-    modalBody.innerHTML = `
-        <div class="modal-field">
-            <div class="modal-field-label">Data</div>
-            <div class="modal-field-value">${dataFormatada}</div>
-        </div>
-        <div class="modal-field">
-            <div class="modal-field-label">Funcionário</div>
-            <div class="modal-field-value">${registro.nome_funcionario}</div>
-        </div>
-        <div class="modal-field">
-            <div class="modal-field-label">Departamento</div>
-            <div class="modal-field-value">${registro.departamento}</div>
-        </div>
-        <div class="modal-field">
-            <div class="modal-field-label">Modalidade</div>
-            <div class="modal-field-value">
-                <span class="table-modalidade modal-${registro.modalidade.replace(/\\s+/g, '-').toLowerCase()}">
-                    ${registro.modalidade}
-                </span>
-            </div>
-        </div>
-        <div class="modal-field">
-            <div class="modal-field-label">Categoria</div>
-            <div class="modal-field-value">${registro.categoria_despesa}</div>
-        </div>
-        <div class="modal-field">
-            <div class="modal-field-label">Descrição</div>
-            <div class="modal-field-value">${registro.descricao_despesa}</div>
-        </div>
-        <div class="modal-field">
-            <div class="modal-field-label">Valor</div>
-            <div class="modal-field-value" style="color: #2d5016; font-weight: bold; font-size: 1.2rem;">
-                R$ ${valorFormatado}
-            </div>
-        </div>
-    `;
-
-    const modal = document.getElementById('modal-detalhes');
-    modal.classList.add('show');
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lançamentos');
+    XLSX.writeFile(wb, `despesas_viagem_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
-// Fechar Modal
-function fecharModal() {
-    const modal = document.getElementById('modal-detalhes');
-    modal.classList.remove('show');
+function formatarMoeda(v) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 }
 
-// Exportar XLSX simples
-function exportarCSV() {
-    const linhasParaExportar = Array.isArray(dadosFiltradosLancamentos) ? dadosFiltradosLancamentos : dadosFiltrados;
-
-    if (!Array.isArray(linhasParaExportar) || linhasParaExportar.length === 0) {
-        alert('Não há dados para exportar. Carregue um CSV ou aplique filtros que retornem resultados.');
-        return;
-    }
-
-    const headers = ['Data', 'Funcionário', 'Departamento', 'Modalidade', 'Categoria', 'Descrição', 'Valor'];
-    const rows = [headers];
-
-    linhasParaExportar.forEach(d => {
-        const data = parseDataBR(d.data);
-        const dataFormatada = data ? data.toLocaleDateString('pt-BR') : d.data;
-        const valor = parseNumero(d.valor);
-        const valorFormatado = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-        rows.push([
-            dataFormatada,
-            d.nome_funcionario || '',
-            d.departamento || '',
-            d.modalidade || '',
-            d.categoria_despesa || '',
-            d.descricao_despesa || '',
-            valorFormatado
-        ]);
-    });
-
-    const tableHtml = rows.map(row => {
-        return '<tr>' + row.map(cell => `<td>${String(cell)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\"/g, '&quot;')
-            .replace(/\'/g, '&#39;')}</td>`).join('') + '</tr>';
-    }).join('');
-
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><table>${tableHtml}</table></body></html>`;
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const nomeArquivo = `despesas_viagem_${new Date().toISOString().split('T')[0]}.xls`;
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = nomeArquivo;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-}
-
-// Mudar de página (Dashboard/Lançamentos)
-function mudaPagina(pagina) {
-    // Atualizar menu ativo
-    document.querySelectorAll('.menu-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.getAttribute('data-page') === pagina) {
-            item.classList.add('active');
-        }
-    });
-
-    // Mostrar página correta
-    document.querySelectorAll('.page').forEach(page => {
-        page.classList.remove('active');
-    });
-
-    if (pagina === 'dashboard') {
-        document.getElementById('dashboard-page').classList.add('active');
-        document.querySelector('.page-title').textContent = 'Dashboard de Despesas';
-    } else if (pagina === 'lancamentos') {
-        document.getElementById('lancamentos-page').classList.add('active');
-        document.querySelector('.page-title').textContent = 'Lançamentos';
-        atualizarTabela();
-    }
-}
-
-// Formatador de moeda
-function formatarMoeda(valor) {
-    return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-    }).format(valor);
+function esc(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
 }
