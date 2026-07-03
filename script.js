@@ -651,7 +651,7 @@ function mudarPagina(pagina) {
 }
 
 function exportarXlsx() {
-    const rows = dadosFiltrados.map(d => {
+    const rows = dadosTabela.map(d => {
         const data = parseData(d.data);
         return {
             Data: data ? data.toLocaleDateString('pt-BR') : d.data,
