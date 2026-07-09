@@ -85,32 +85,6 @@
                     <button type="button" class="btn btn-danger btn-block" id="btn-reset-filtros">Limpar Filtros</button>
                 </div>
             </div>
-
-            <div class="sidebar-modalidades">
-                <div class="modalidades-card">
-                    <div class="modalidades-header">
-                        <h3>Modalidades</h3>
-                        <div class="toggle-group">
-                            <button type="button" class="toggle-btn active" id="btn-modal-quantidade">Qtd</button>
-                            <button type="button" class="toggle-btn" id="btn-modal-valor">Valor</button>
-                        </div>
-                    </div>
-                    <div class="modalidade-items">
-                        <div class="modalidade-item">
-                            <span>Cartão</span>
-                            <strong id="modal-cartao">0</strong>
-                        </div>
-                        <div class="modalidade-item">
-                            <span>Numerário</span>
-                            <strong id="modal-numerario">0</strong>
-                        </div>
-                        <div class="modalidade-item">
-                            <span>Agência</span>
-                            <strong id="modal-agencia">0</strong>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </aside>
 
         <main class="main">
@@ -160,6 +134,9 @@
 
                     <div class="charts-grid">
                         <div class="chart-card chart-half">
+                            <button type="button" class="btn-chart-copy" data-chart="modalidades" title="Copiar imagem do gráfico">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            </button>
                             <h3 class="chart-title">Distribuição por Modalidade</h3>
                             <p class="chart-hint">Clique em uma fatia para filtrar</p>
                             <div class="chart-wrap chart-wrap-pie">
@@ -169,6 +146,9 @@
                         </div>
 
                         <div class="chart-card chart-half">
+                            <button type="button" class="btn-chart-copy" data-chart="categorias" title="Copiar imagem do gráfico">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            </button>
                             <h3 class="chart-title">Despesas por Categoria</h3>
                             <p class="chart-hint">Top 10 — clique na barra para filtrar</p>
                             <div class="chart-wrap">
@@ -177,6 +157,9 @@
                         </div>
 
                         <div class="chart-card chart-half">
+                            <button type="button" class="btn-chart-copy" data-chart="departamentos" title="Copiar imagem do gráfico">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            </button>
                             <h3 class="chart-title">Despesas por Departamento</h3>
                             <p class="chart-hint">Top 10 — clique na barra para filtrar</p>
                             <div class="chart-wrap">
@@ -185,6 +168,9 @@
                         </div>
 
                         <div class="chart-card chart-half">
+                            <button type="button" class="btn-chart-copy" data-chart="funcionarios" title="Copiar imagem do gráfico">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            </button>
                             <h3 class="chart-title">Despesas por Funcionário</h3>
                             <p class="chart-hint">Top 15 — clique na barra para filtrar</p>
                             <div class="chart-wrap">
@@ -193,6 +179,9 @@
                         </div>
 
                         <div class="chart-card chart-full">
+                            <button type="button" class="btn-chart-copy" data-chart="mensal" title="Copiar imagem do gráfico">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            </button>
                             <h3 class="chart-title">Despesas por Mês</h3>
                             <p class="chart-hint">Clique em um ponto para filtrar o mês</p>
                             <div class="chart-wrap chart-wrap-line">
@@ -240,7 +229,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
     <script src="supabase-config.js"></script>
     <script src="script.js"></script>
 </body>

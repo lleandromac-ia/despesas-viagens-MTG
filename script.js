@@ -29,7 +29,6 @@ let dados = [];
 let dadosFiltrados = [];
 let dadosTabela = [];
 let paginaAtual = 1;
-let modalidadeMode = 'quantidade';
 let periodoInicio = null;
 let periodoFim = null;
 let charts = {};
@@ -65,13 +64,50 @@ function inicializarEventos() {
     document.getElementById('search-global').addEventListener('input', aplicarFiltros);
     document.getElementById('btn-reload').addEventListener('click', carregarDados);
 
-    document.getElementById('btn-modal-quantidade').addEventListener('click', () => setModalidadeMode('quantidade'));
-    document.getElementById('btn-modal-valor').addEventListener('click', () => setModalidadeMode('valor'));
-
     document.getElementById('search-lancamentos').addEventListener('input', filtrarTabela);
     document.getElementById('btn-export').addEventListener('click', exportarXlsx);
     document.getElementById('btn-prev').addEventListener('click', () => mudarPaginaTabela(-1));
     document.getElementById('btn-next').addEventListener('click', () => mudarPaginaTabela(1));
+
+    document.querySelectorAll('.btn-chart-copy').forEach(btn => {
+        btn.addEventListener('click', () => copiarGraficoParaClipboard(btn.dataset.chart, btn));
+    });
+}
+
+async function copiarGraficoParaClipboard(chartKey, btn) {
+    const chart = charts[chartKey];
+    if (!chart) return;
+
+    try {
+        const origem = chart.canvas;
+        const destino = document.createElement('canvas');
+        destino.width = origem.width;
+        destino.height = origem.height;
+        const ctx = destino.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, destino.width, destino.height);
+        ctx.drawImage(origem, 0, 0);
+
+        const blob = await new Promise(resolve => destino.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('Falha ao gerar imagem do gráfico.');
+
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        indicarResultadoCopia(btn, true);
+    } catch (erro) {
+        console.error('Erro ao copiar gráfico para a área de transferência:', erro);
+        indicarResultadoCopia(btn, false);
+    }
+}
+
+function indicarResultadoCopia(btn, sucesso) {
+    const iconeOriginal = btn.innerHTML;
+    btn.innerHTML = sucesso ? '✓' : '✕';
+    btn.classList.toggle('copy-success', sucesso);
+    btn.classList.toggle('copy-error', !sucesso);
+    setTimeout(() => {
+        btn.innerHTML = iconeOriginal;
+        btn.classList.remove('copy-success', 'copy-error');
+    }, 1500);
 }
 
 async function carregarDados() {
@@ -375,25 +411,6 @@ function atualizarKpis() {
     document.getElementById('total-despesas').textContent = formatarMoeda(total);
     document.getElementById('total-lancamentos').textContent = qtd.toLocaleString('pt-BR');
     document.getElementById('ticket-medio').textContent = formatarMoeda(ticket);
-
-    const mods = { 'CARTÃO CORPORATIVO': 0, 'NUMERÁRIO': 0, 'AGÊNCIA DE VIAGENS': 0 };
-    dadosFiltrados.forEach(d => {
-        if (mods[d.modalidade] !== undefined) {
-            mods[d.modalidade] += modalidadeMode === 'valor' ? d.valor : 1;
-        }
-    });
-
-    const fmt = v => modalidadeMode === 'valor' ? formatarMoeda(v) : v.toLocaleString('pt-BR');
-    document.getElementById('modal-cartao').textContent = fmt(mods['CARTÃO CORPORATIVO']);
-    document.getElementById('modal-numerario').textContent = fmt(mods['NUMERÁRIO']);
-    document.getElementById('modal-agencia').textContent = fmt(mods['AGÊNCIA DE VIAGENS']);
-}
-
-function setModalidadeMode(mode) {
-    modalidadeMode = mode;
-    document.getElementById('btn-modal-quantidade').classList.toggle('active', mode === 'quantidade');
-    document.getElementById('btn-modal-valor').classList.toggle('active', mode === 'valor');
-    atualizarKpis();
 }
 
 function agruparPor(campo) {
@@ -651,7 +668,7 @@ function mudarPagina(pagina) {
 }
 
 function exportarXlsx() {
-    const rows = dadosTabela.map(d => {
+    const rows = dadosFiltrados.map(d => {
         const data = parseData(d.data);
         return {
             Data: data ? data.toLocaleDateString('pt-BR') : d.data,
